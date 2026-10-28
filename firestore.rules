@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function logado() { return request.auth != null; }
+
+    match /ocorrencias/{ocorrenciaId} {
+      allow read: if logado();
+      // Só cria em nome próprio e sempre como "não resolvido".
+      allow create: if logado()
+        && request.resource.data.autorId == request.auth.uid
+        && request.resource.data.resolvido == false
+        && request.resource.data.titulo is string && request.resource.data.titulo.size() > 0
+        && request.resource.data.local is string && request.resource.data.local.size() > 0;
+      // Só o dono altera, e apenas o campo "resolvido".
+      allow update: if logado()
+        && resource.data.autorId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolvido'])
+        && request.resource.data.resolvido is bool;
+      allow delete: if false;
+
+      match /pistas/{pistaId} {
+        allow read: if logado();
+        allow create: if logado()
+          && request.resource.data.autorId == request.auth.uid
+          && request.resource.data.mensagem is string
+          && request.resource.data.mensagem.size() > 0;
+        allow update, delete: if false;
+      }
+    }
+  }
+}
